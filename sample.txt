@@ -1,0 +1,259 @@
+X = raw_df.comment
+Y = raw_df.label
+le = LabelEncoder()
+Y = le.fit_transform(Y)
+Y = Y.reshape(-1,1)
+
+X_train,X_test,Y_train,Y_test = train_test_split(X,Y,test_size=0.15)
+
+
+tok_words = 50000
+max_len = len(X_train[0])
+tok = Tokenizer(num_words=tok_words)
+tok.fit_on_texts(X_train)
+sequences = tok.texts_to_sequences(X_train)
+sequences_matrix = sequence.pad_sequences(sequences,maxlen=max_len)
+
+inp_dim = 300
+
+def RNN():
+    inputs = Input(name='inputs',shape=[max_len])
+    layer = Embedding(inp_dim,50,input_length=max_len)(inputs)
+    
+    layer = LSTM(64)(layer)
+    layer = Dense(256,name='FC1')(layer)
+    layer = Activation('relu')(layer)
+    # layer = BatchNormalization()(layer)
+    layer = Dropout(0.5)(layer)
+
+    layer = Dense(1,name='out_layer')(layer)
+    layer = Activation('sigmoid')(layer)
+    model = Model(inputs=inputs,outputs=layer)
+    return model
+
+model = RNN()
+model.summary()
+model.compile(loss='binary_crossentropy',optimizer='rmsprop',metrics=['accuracy'])
+
+model.fit(sequences_matrix,Y_train,batch_size=128,epochs=30,
+          validation_split=0.2,callbacks=[EarlyStopping(monitor='val_loss',min_delta=0.0001,patience=5)])
+
+
+test_sequences = tok.texts_to_sequences(X_test)
+test_sequences_matrix = sequence.pad_sequences(test_sequences,maxlen=max_len)
+
+accr = model.evaluate(test_sequences_matrix,Y_test)
+
+print('Test set\n  Loss: {:0.3f}\n  Accuracy: {:0.3f}'.format(accr[0],accr[1]))
+
+
+------------------------------------------------------
+tok = Tokenizer()
+tok.fit_on_texts(raw_df['Review'])
+wrdidx = tok.word_index
+idxwrd = tok.index_word
+
+wrdcnt = tok.word_counts
+distwrds = len(wrdcnt)
+
+print(distwrds)
+
+seq = tok.texts_to_sequences(raw_df['Review'])
+
+trnlen = 50
+feature_list = []
+label_list = []
+
+for ele in seq:
+
+  for ele2 in range(trnlen,trnlen+350):
+    extract = seq[ele2-trnlen:ele2-trnlen+20]
+
+    if len(extract) > 0:
+      feature_list.append(extract[:-1])
+      label_list.append(extract[-1])
+
+# One hot encoding of labels
+X  = np.array(feature_list)
+print((len(label_list), distwrds))
+y = np.zeros((len(label_list), distwrds), dtype=np.int8)
+
+y
+
+
+---------------------------------------------------------------------------------------
+
+model = Sequential()
+model.add(Embedding(input_dim=distwrds,output_dim=100,weights=None,trainable=True))
+model.add(LSTM(64, return_sequences=False, dropout=0.1,recurrent_dropout=0.1))
+model.add(Dense(64, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(distwrds, activation='softmax'))
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+model.summary()
+
+h = model.fit(np.array(feature_list), np.array(label_list), epochs = 1, batch_size = 100, verbose = 1)
+
+---------------------------------------------------------------------------------------
+
+from nltk.tokenize import RegexpTokenizer
+import nltk
+from nltk.corpus import stopwords
+nltk.download('stopwords')
+
+from nltk.stem import LancasterStemmer
+from sklearn.feature_extraction.text import TfidfVectorizer 
+
+raw_df = pd.read_csv('NLP_model-1.csv')
+raw_df = raw_df.dropna(how='any',axis=0)
+raw_df.head(2)
+
+text_data_list = raw_df['Review'].to_list()
+
+tok_data_list = []
+for ele in text_data_list:
+    regtok = RegexpTokenizer('\w+')
+    tok_data_temp = regtok.tokenize(ele)
+    tok_data_list.append(tok_data_temp)
+    
+tok_data_list
+
+low_text = []
+for ele in tok_data_list:
+    low_temp = [x.lower() for x in ele]
+    low_text.append(low_temp)
+    
+low_text
+
+
+punck_list =['!','@','#','$','%','^','&','*','(',')','-','+','=','{','}','[',']','|',':',';','?','<','>',',','/','\\','\/']
+
+punckt_data_list = []
+for ele in low_text:
+    
+    punckt_data_inner_list = []
+    for ele2 in ele:
+        if ele2 not in punck_list:
+            punckt_data_inner_list.append(ele2)
+    punckt_data_list.append(punckt_data_inner_list)
+
+
+punckt_data_list
+
+stpwrd_list = stopwords.words('english')
+
+stpwrd_data_list = []
+for ele in punckt_data_list:
+    
+    inner_list = []
+    for ele2 in ele:
+        if ele2 not in stpwrd_list:
+            inner_list.append(ele2)
+    stpwrd_data_list.append(inner_list)
+
+stpwrd_data_list
+
+stmmr = LancasterStemmer()
+
+lemm_data_list = []
+for ele in stpwrd_data_list:
+#     print(ele)
+    inner_list = []
+    for ele2 in ele:
+        stm_wrd = stmmr.stem(ele2)
+        inner_list.append(stm_wrd)
+    lemm_data_list.append(inner_list)
+
+
+lemm_data_list
+
+
+pd.DataFrame(lemm_data_list)
+
+seq_sent = []
+for ele in lemm_data_list:
+    print(ele)
+    
+    filterm = ''
+    tempterm = []
+    for ele2 in ele:
+        filterm = filterm + ' ' + ele2
+    seq_sent.append(filterm)
+
+seq_sent
+
+tfidfvec =  TfidfVectorizer(max_features=5000)
+vec_text_data = tfidfvec.fit_transform(seq_sent)
+vec_text_data
+
+vec_text_data[1]
+
+raw_df
+
+clean_txt_df = pd.DataFrame(seq_sent,columns=['clean_txt'])
+clean_txt_df['Star'] = raw_df['Star']
+clean_txt_df.loc[clean_txt_df['Star'] > 3, 'label'] = 1
+clean_txt_df.loc[clean_txt_df['Star'] <= 3, 'label'] = 0
+clean_txt_df.drop(labels=['Star'],axis=1,inplace=True)
+clean_txt_df = clean_txt_df.dropna(how='any',axis=0)
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+
+X_train, X_test, y_train, y_test = train_test_split(clean_txt_df['clean_txt'],clean_txt_df['label'],test_size=0.2)
+
+
+clean_txt_df
+
+tfidfvec =  TfidfVectorizer(max_features=5000)
+tfidfvec.fit(clean_txt_df['clean_txt'])
+
+X_train_tfidf = tfidfvec.transform(X_train)
+X_test_tfidf = tfidfvec.transform(X_test)
+
+rfc_clf = RandomForestClassifier()
+rfc_clf.fit(X_train_tfidf,y_train)
+y_pred = rfc_clf.predict(X_test_tfidf)
+
+print("Classification report:")
+print(classification_report(y_test,y_pred))
+
+--------------------------------------
+
+from textblob import TextBlob
+
+sentiment_scores_tb = [round(TextBlob(article).sentiment.polarity, 3) for article in news_df['clean_text']]
+
+sentiment_category_tb = ['positive' if score > 0 
+                             else 'negative' if score < 0 
+                                 else 'neutral' 
+                                     for score in sentiment_scores_tb]
+
+df = pd.DataFrame([list(news_df['news_category']), sentiment_scores_tb, sentiment_category_tb]).T
+df.columns = ['news_category', 'sentiment_score', 'sentiment_category']
+df['sentiment_score'] = df.sentiment_score.astype('float')
+df.groupby(by=['news_category']).describe()
+
+
+--------------------------------------
+
+
+from afinn import Afinn
+
+af = Afinn()
+
+sentiment_scores = [af.score(article) for article in corpus]
+
+sentiment_category = ['positive' if score > 0 
+                          else 'negative' if score < 0 
+                              else 'neutral' 
+                                  for score in sentiment_scores]
+
+df = pd.DataFrame([list(news_df['news_category']), sentiment_scores, sentiment_category]).T
+
+df.columns = ['news_category', 'sentiment_score', 'sentiment_category']
+
+df['sentiment_score'] = df.sentiment_score.astype('float')
+
+df.groupby(by=['news_category']).describe()
